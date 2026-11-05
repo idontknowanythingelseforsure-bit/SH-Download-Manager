@@ -46,7 +46,7 @@ android.permissions = INTERNET,ACCESS_NETWORK_STATE,WAKE_LOCK
 android.manifest.intent_filters = android_intent_filters.xml
 # androidx FileProvider, used by "Open" / "Open Folder" in the completion card.
 android.extra_manifest_application_arguments = android_extra_application.xml
-android.gradle_dependencies = androidx.core:core:1.13.1
+android.gradle_dependencies = androidx.core:core:1.10.1
 android.add_resources = android_res
 
 android.api = 33
