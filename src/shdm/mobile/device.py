@@ -276,3 +276,130 @@ def _open_desktop(path: Path) -> None:
         subprocess.Popen(["open", str(path)])
     else:
         subprocess.Popen(["xdg-open", str(path)])
+
+
+# ---------------------------------------------------------------------------
+# Merging media streams without ffmpeg
+# ---------------------------------------------------------------------------
+def can_mux() -> bool:
+    """True when the platform can remux an MP4 video plus an M4A audio track.
+
+    YouTube (and most streaming sites) only offer separate video and audio
+    streams, so a merged file needs a muxer.  The Windows build uses the
+    bundled ffmpeg; on Android the platform's ``MediaMuxer`` copies the samples
+    without re-encoding, which is enough for H.264 + AAC.
+    """
+    if not ANDROID:
+        return False
+    try:
+        from jnius import autoclass
+
+        autoclass("android.media.MediaMuxer")
+        autoclass("android.media.MediaExtractor")
+        return True
+    except Exception:
+        return False
+
+
+def mux_mp4(video_path, audio_path, out_path) -> None:
+    """Copy the first video and audio track of two files into one MP4."""
+    from jnius import autoclass
+
+    if not can_mux():  # pragma: no cover - desktop preview
+        raise RuntimeError("Merging video and audio is not available here.")
+
+    MediaExtractor = autoclass("android.media.MediaExtractor")
+    MediaMuxer = autoclass("android.media.MediaMuxer")
+    OutputFormat = autoclass("android.media.MediaMuxer$OutputFormat")
+    BufferInfo = autoclass("android.media.MediaCodec$BufferInfo")
+    ByteBuffer = autoclass("java.nio.ByteBuffer")
+
+    def first_track(extractor, prefix: str) -> int:
+        for index in range(int(extractor.getTrackCount())):
+            mime = str(extractor.getTrackFormat(index).getString("mime"))
+            if mime.startswith(prefix):
+                return index
+        return -1
+
+    video = MediaExtractor()
+    video.setDataSource(str(video_path))
+    audio = MediaExtractor()
+    audio.setDataSource(str(audio_path))
+
+    try:
+        video_track = first_track(video, "video/")
+        audio_track = first_track(audio, "audio/")
+    except Exception:
+        video.release()
+        audio.release()
+        raise
+
+    if video_track < 0 or audio_track < 0:
+        video.release()
+        audio.release()
+        raise RuntimeError("The downloaded streams could not be merged.")
+
+    if Path(out_path).exists():
+        try:
+            Path(out_path).unlink()
+        except OSError:
+            pass
+
+    muxer = MediaMuxer(str(out_path), OutputFormat.MUXER_OUTPUT_MPEG_4)
+    try:
+        out_video = muxer.addTrack(video.getTrackFormat(video_track))
+        out_audio = muxer.addTrack(audio.getTrackFormat(audio_track))
+        video.selectTrack(video_track)
+        audio.selectTrack(audio_track)
+
+        # readSampleData needs direct buffers; one per track so the next sample
+        # of a track can be read while the other track's sample is pending.
+        buffers = {
+            out_video: ByteBuffer.allocateDirect(4 << 20),
+            out_audio: ByteBuffer.allocateDirect(1 << 20),
+        }
+        extractors = {out_video: video, out_audio: audio}
+        info = BufferInfo()
+
+        def next_sample(out_track):
+            extractor = extractors[out_track]
+            size = int(extractor.readSampleData(buffers[out_track], 0))
+            if size < 0:
+                return None
+            return (int(extractor.getSampleTime()), size,
+                    int(extractor.getSampleFlags()))
+
+        pending = {track: next_sample(track) for track in buffers}
+
+        muxer.start()
+        try:
+            while True:
+                ready = [(sample[0], track) for track, sample in pending.items()
+                         if sample is not None]
+                if not ready:
+                    break
+                _time, track = min(ready)
+                time_us, size, flags = pending[track]
+                info.set(0, size, time_us, flags)
+                muxer.writeSampleData(track, buffers[track], info)
+                extractor = extractors[track]
+                if extractor.advance():
+                    pending[track] = next_sample(track)
+                else:
+                    pending[track] = None
+        finally:
+            try:
+                muxer.stop()
+            except Exception:
+                pass
+    finally:
+        try:
+            muxer.release()
+        except Exception:
+            pass
+        video.release()
+        audio.release()
+
+    if not Path(out_path).is_file() or Path(out_path).stat().st_size <= 0:
+        raise RuntimeError("Merging the streams produced an empty file.")
+

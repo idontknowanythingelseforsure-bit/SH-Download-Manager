@@ -98,6 +98,46 @@ def _base_opts(skip: bool = True) -> dict:
     return opts
 
 
+def platform_muxer():
+    """A callable (video, audio, output) that merges streams, or None.
+
+    Windows uses the bundled ffmpeg through yt-dlp itself, so this is only
+    needed where yt-dlp has no ffmpeg (the Android build uses MediaMuxer).
+    """
+    if ffmpeg_dir():
+        return None
+    try:
+        from .mobile import device
+
+        if device.can_mux():
+            return device.mux_mp4
+    except Exception:
+        pass
+    return None
+
+
+def video_selector() -> str:
+    """Format selector for the VIDEO option in the Add dialog."""
+    if ffmpeg_dir():
+        return "bv*+ba/b"
+    if platform_muxer() is not None:
+        # Two streams joined by MediaMuxer; H.264 + AAC is the safe pair.  The
+        # plain-HTTP (progressive) stream is preferred because MediaExtractor
+        # reads it on every supported Android version; fragmented m3u8 mp4 is
+        # the fallback for videos that only publish segmented streams.
+        return ("bv*[ext=mp4][vcodec^=avc1][protocol^=http]/"
+                "bv*[ext=mp4][vcodec^=avc1]/bv*[ext=mp4]"
+                "+ba[ext=m4a]")
+    return "b"
+
+
+def audio_selector() -> str:
+    """Format selector for the AUDIO option in the Add dialog."""
+    if ffmpeg_dir():
+        return "ba/b|mp3:192"
+    return "ba[ext=m4a]/ba/b"
+
+
 def _first_entry(info: dict) -> dict:
     if info.get("_type") in ("playlist", "multi_video"):
         entries = [e for e in (info.get("entries") or []) if e]
@@ -144,6 +184,7 @@ def list_formats(url: str, limit: int = 12) -> list[dict]:
             by_height[height] = f
 
     has_ffmpeg = ffmpeg_dir() is not None
+    can_merge = has_ffmpeg or platform_muxer() is not None
     entries: list[dict] = []
 
     for height in sorted(by_height, reverse=True):
@@ -153,7 +194,7 @@ def list_formats(url: str, limit: int = 12) -> list[dict]:
         merged = bool(stream.get("acodec") in (None, "none"))
         if size is not None and merged and audio_size:
             size += audio_size
-        if merged and not has_ffmpeg:
+        if merged and not can_merge:
             continue
         if height >= 2160:
             quality = "4K"
@@ -164,7 +205,12 @@ def list_formats(url: str, limit: int = 12) -> list[dict]:
         else:
             quality = "%dp" % height
         if merged:
-            selector = ("bv*[height<=%d]+ba/b[height<=%d]" % (height, height))
+            if has_ffmpeg:
+                selector = ("bv*[height<=%d]+ba/b[height<=%d]" % (height, height))
+            else:
+                selector = ("bv*[height<=%d][ext=mp4][vcodec^=avc1]"
+                            "[protocol^=http]/bv*[height<=%d][ext=mp4][vcodec^=avc1]"
+                            "+ba[ext=m4a]" % (height, height))
             label = "MP4 file, quality %s (video + audio)" % quality
         else:
             selector = ("b[height<=%d][ext=%s]/b[height<=%d]" % (height, ext, height))
@@ -207,7 +253,7 @@ def list_formats(url: str, limit: int = 12) -> list[dict]:
             "kind": "video",
             "label": "Best available quality",
             "ext": "mp4",
-            "selector": "bv*+ba/b" if has_ffmpeg else "b",
+            "selector": "bv*+ba/b" if has_ffmpeg else video_selector(),
             "size": None,
             "title": title,
         })
@@ -215,8 +261,141 @@ def list_formats(url: str, limit: int = 12) -> list[dict]:
     return entries[:limit]
 
 
+def _grab(url: str, selector: str, outtmpl: Path, base: dict, hook) -> tuple[Path, dict]:
+    """One yt-dlp download with its own format selector and output name."""
+    import yt_dlp
+
+    opts = dict(base)
+    opts.pop("postprocessors", None)
+    opts["format"] = selector
+    opts["outtmpl"] = str(outtmpl)
+    opts["progress_hooks"] = [hook]
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True) or {}
+        path = None
+        requested = info.get("requested_downloads") or []
+        if requested:
+            path = requested[0].get("filepath")
+        if not path:
+            path = ydl.prepare_filename(info)
+
+    final = Path(path)
+    if not final.exists():
+        raise RuntimeError("yt-dlp finished without producing a file.")
+    return final, info
+
+
+def _download_and_merge(url: str, selector: str, save_dir: Path, stem: str,
+                        opts: dict, progress, stop, muxer) -> tuple[Path, dict]:
+    """Fetch the video and audio streams separately, then mux them.
+
+    Used where yt-dlp has no ffmpeg (the Android build): the platform muxer
+    copies the H.264 video track and the AAC audio track without re-encoding.
+    """
+    video_sel, _, audio_sel = selector.partition("+")
+    video_sel = video_sel.strip() or "bv*[ext=mp4]"
+    audio_sel = audio_sel.strip() or "ba[ext=m4a]"
+
+    state = {"done": 0, "total": 0}
+
+    def tracked_hook(_name):
+        def hook(data):
+            if stop is not None and stop():
+                raise Cancelled()
+            status = data.get("status")
+            if status == "downloading" and progress is not None:
+                total = int(data.get("total_bytes")
+                            or data.get("total_bytes_estimate") or 0)
+                if total:
+                    state["total"] = max(state["total"], state["done"] + total)
+                payload = dict(data)
+                payload["downloaded_bytes"] = (
+                    state["done"] + int(data.get("downloaded_bytes") or 0))
+                if state["total"]:
+                    payload["total_bytes"] = state["total"]
+                    payload["total_bytes_estimate"] = state["total"]
+                try:
+                    progress(payload)
+                except Cancelled:
+                    raise
+                except Exception:
+                    pass
+            elif status == "finished":
+                state["done"] += int(data.get("total_bytes")
+                                     or data.get("downloaded_bytes") or 0)
+        return hook
+
+    pair_error = None
+    video_path = audio_path = None
+    video_info: dict = {}
+    try:
+        video_path, video_info = _grab(
+            url, video_sel, save_dir / (stem + ".video.%(ext)s"),
+            opts, tracked_hook("video"))
+        audio_path, _audio_info = _grab(
+            url, audio_sel, save_dir / (stem + ".audio.%(ext)s"),
+            opts, tracked_hook("audio"))
+    except Cancelled:
+        raise
+    except Exception as exc:  # noqa: BLE001 - fall back to a single-file format
+        pair_error = exc
+        for pattern in (".part", ".ytdl", ".vtt"):
+            for leftover in save_dir.glob(stem + "*" + pattern):
+                try:
+                    leftover.unlink()
+                except OSError:
+                    pass
+        for side in (".video.", ".audio."):
+            for leftover in save_dir.glob(stem + side + "*"):
+                if leftover.name.endswith(".part"):
+                    continue
+                try:
+                    leftover.unlink()
+                except OSError:
+                    pass
+
+    if video_path is None or audio_path is None:
+        # A few videos still publish one muxed file; use it when it exists.
+        try:
+            single, info = _grab(url, "b[ext=mp4]/b", save_dir / (stem + ".%(ext)s"),
+                                 opts, tracked_hook("file"))
+            return single, info
+        except Cancelled:
+            raise
+        except Exception:
+            detail = str(pair_error or "no matching streams")
+            raise RuntimeError(
+                "This video only offers separate video and audio streams and "
+                f"they could not be merged ({detail}). Try AUDIO instead."
+            ) from pair_error
+
+    out = save_dir / (stem + ".mp4")
+    try:
+        muxer(video_path, audio_path, out)
+    except Exception as exc:  # noqa: BLE001 - surface a readable reason
+        # Keep the two streams: a retry only has to mux them again.
+        try:
+            if Path(out).exists():
+                Path(out).unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"Video and audio downloaded, but merging them failed ({exc})."
+        ) from exc
+
+    for part in (video_path, audio_path):
+        try:
+            Path(part).unlink()
+        except OSError:
+            pass
+
+    info = dict(video_info or {})
+    return out, info
+
+
 def download(url: str, selector: str, save_dir: Path, stem: str,
-             progress=None, stop=None) -> tuple[Path, dict]:
+             progress=None, stop=None, muxer=None) -> tuple[Path, dict]:
     """Download a media page. Returns (final_path, info)."""
     import yt_dlp
 
@@ -234,6 +413,18 @@ def download(url: str, selector: str, save_dir: Path, stem: str,
         except ValueError:
             audio_quality = 192
         selector = selector or "ba/b"
+
+    if ffmpeg_dir() is None and "+" in selector and audio_quality is None:
+        if muxer is None:
+            muxer = platform_muxer()
+        if muxer is None:
+            raise RuntimeError(
+                "This video only offers separate video and audio streams, and "
+                "this build has no way to merge them. Try AUDIO instead."
+            )
+        return _download_and_merge(url, selector, save_dir, stem, opts,
+                                   progress, stop, muxer)
+
     opts.update({
         "format": selector,
         "outtmpl": str(save_dir / (stem + ".%(ext)s")),

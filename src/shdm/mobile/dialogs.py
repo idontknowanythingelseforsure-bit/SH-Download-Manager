@@ -16,6 +16,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 
 from shdm import grabber, ytdl
+from shdm.engine import clean_error
 from shdm.settings import category_for
 from shdm.util import human_size
 
@@ -58,6 +59,19 @@ def labelled(title, widget, height=None):
     box.add_widget(widget)
     box.height = dp(16) + widget.height + dp(2)
     return box
+
+
+def wrapped_label(text="", size=12, color=TEXT, width=None, **kwargs):
+    """Left-aligned label whose height follows the wrapped text."""
+    label = Label(
+        text=text, font_size=sp(size), color=color, halign="left",
+        valign="top", size_hint_y=None, **kwargs
+    )
+    label.bind(width=lambda inst, w: setattr(inst, "text_size", (w, None)))
+    label.bind(texture_size=lambda inst, ts: setattr(inst, "height", ts[1]))
+    if width is not None:
+        label.width = width
+    return label
 
 
 class BaseDialog(ModalView):
@@ -142,9 +156,8 @@ class AddDialog(BaseDialog):
         url_row.add_widget(paste)
         body.add_widget(labelled("Link", url_row))
 
-        self.hint = make_label(
+        self.hint = wrapped_label(
             "Paste a link or share one from your browser.", size=11, color=MUTED,
-            height=30,
         )
         body.add_widget(self.hint)
 
@@ -187,7 +200,7 @@ class AddDialog(BaseDialog):
         media_row.add_widget(self.audio)
         body.add_widget(media_row)
 
-        self.error = make_label("", size=11, color=RED, height=0)
+        self.error = wrapped_label("", size=11, color=RED)
         body.add_widget(self.error)
 
         self.footer(
@@ -235,6 +248,7 @@ class AddDialog(BaseDialog):
             self._probe_event.cancel()
             self._probe_event = None
         self._probe_token += 1
+        self.error.text = ""
         if not URL_OK.match(text):
             self.hint.text = "Paste a link or share one from your browser."
             self.hint.color = MUTED
@@ -288,7 +302,6 @@ class AddDialog(BaseDialog):
     def _submit(self, start_now):
         url = (self.url_input.text or "").strip()
         if not URL_OK.match(url):
-            self.error.height = dp(18)
             self.error.text = "Enter a link that starts with http:// or https://"
             return
         base = (self.folder_input.text or "").strip()
@@ -307,11 +320,9 @@ class AddDialog(BaseDialog):
                 else:
                     save_dir = base
                 if audio:
-                    selector = "ba[ext=m4a]/ba/b"
-                    if ytdl.ffmpeg_dir():
-                        selector = "ba/b|mp3:192"
+                    selector = ytdl.audio_selector()
                 else:
-                    selector = "bv*+ba/b" if ytdl.ffmpeg_dir() else "b"
+                    selector = ytdl.video_selector()
                 task, added = self.app.engine.add_ytdl(
                     url, selector, kind="audio" if audio else "video",
                     save_dir=save_dir, start_now=start_now,
@@ -324,8 +335,7 @@ class AddDialog(BaseDialog):
                     start_now=start_now,
                 )
         except Exception as exc:  # noqa: BLE001 - surface validation errors
-            self.error.height = dp(18)
-            self.error.text = str(exc)
+            self.error.text = clean_error(exc)
             return
         self.dismiss()
         if added:
@@ -472,7 +482,7 @@ class CompletionPopup(BaseDialog):
 
 class DetailsPopup(BaseDialog):
     def __init__(self, app, snap, **kwargs):
-        super().__init__("Details", width=440, height=440, **kwargs)
+        super().__init__("Details", width=440, height=470, **kwargs)
         self.app = app
         self.snap = snap
         body = self.body()
@@ -488,6 +498,17 @@ class DetailsPopup(BaseDialog):
             make_label(f"Size: {snap.get('size_text') or 'unknown'}", size=12,
                        color=MUTED, height=20)
         )
+        # The error comes first: it is the reason someone opens this popup.
+        error = (snap.get("error") or "").strip()
+        if error:
+            body.add_widget(make_label("Error", size=11, color=MUTED, height=18))
+            body.add_widget(wrapped_label(error, size=11, color=RED))
+            copy = FlatButton(
+                text="Copy error", bg=PANEL_HI, font_size=11,
+                size_hint=(None, None), size=(dp(100), dp(30)), radius=8,
+            )
+            copy.bind(on_release=lambda *_: self._copy(error))
+            body.add_widget(copy)
         body.add_widget(
             make_label("Saved to", size=11, color=MUTED, height=18)
         )
@@ -517,6 +538,15 @@ class DetailsPopup(BaseDialog):
 
     def _open(self):
         self.app.open_path(self.snap.get("target_path") or "")
+
+    def _copy(self, text):
+        try:
+            from kivy.core.clipboard import Clipboard
+
+            Clipboard.copy(text)
+        except Exception:
+            pass
+        self.app.root_widget.toast("Error copied")
 
 
 class AboutPopup(BaseDialog):

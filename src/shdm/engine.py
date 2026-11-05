@@ -20,6 +20,20 @@ CHUNK = 64 * 1024
 USER_AGENT = None  # replaced by settings
 
 
+def clean_error(exc: object) -> str:
+    """Readable one-paragraph message for the UI.
+
+    yt-dlp prefixes its messages with ``ERROR:`` and sometimes appends
+    tracebacks; keep the explanation but drop that noise.
+    """
+    text = str(exc or "").strip()
+    if text.startswith("ERROR:"):
+        text = text[len("ERROR:"):].strip()
+    lines = [line for line in text.splitlines() if line.strip()]
+    text = "\n".join(lines).strip()
+    return text or "Download failed."
+
+
 class FatalError(Exception):
     pass
 
@@ -948,7 +962,7 @@ class DownloadManager:
         except ytdl.Cancelled:
             raise PauseRequested
         except Exception as exc:  # noqa: BLE001 - surface extractor errors in the UI
-            raise FatalError(str(exc)) from exc
+            raise FatalError(clean_error(exc)) from exc
 
         info = info or {}
         title = str(info.get("title") or Path(final).stem)

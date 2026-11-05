@@ -146,6 +146,8 @@ Ordinary files use `http://` or `https://` links. FTP, torrents and streaming ma
 
 Links to supported media pages (YouTube, Vimeo, SoundCloud, Facebook, Instagram, TikTok, X/Twitter, Twitch and others) are downloaded with yt-dlp. Adding a plain YouTube link starts the best video+audio download; the extension panel and `POST /formats` expose the per-quality choice.
 
+YouTube now serves video and audio as separate streams, so **VIDEO** downloads are fetched in two parts and merged. The Windows build merges with the bundled `ffmpeg`; the Android build merges with the platform's `MediaMuxer`, which copies the H.264 and AAC tracks without re-encoding and needs no bundled binary.
+
 ## Data locations
 
 - Settings: `%APPDATA%\SHDownloadManager\settings.json`
@@ -197,7 +199,7 @@ Covered cases: multipart downloads, `Content-Disposition` and redirects, servers
 - No native messaging host; the extension uses the localhost API.
 - No shell context-menu handler in this release (the extension and `shdm://` handler are provided instead).
 - The tray icon, autostart, drag-and-drop and installer are Windows-only.
-- Audio extraction on Android needs an `ffmpeg` binary, which is not bundled, so **AUDIO** downloads are saved as M4A. The Windows build bundles `ffmpeg` and converts to MP3.
+- Audio extraction on Android needs an `ffmpeg` binary, which is not bundled, so **AUDIO** downloads are saved as M4A. The Windows build bundles `ffmpeg` and converts to MP3. **VIDEO** downloads work on both platforms: Android merges the separate streams with `MediaMuxer`, no `ffmpeg` required.
 - Android downloads keep running while the app is alive (a partial wake lock is held), but there is no foreground service yet, so the system may stop a transfer if it reclaims the app.
 
 ## Android
@@ -215,7 +217,7 @@ repository root is the Kivy entry point.
 
 ### Install the APK
 
-Download `shdownloadmanager-1.1.0-arm64-v8a-debug.apk` from the
+Download `shdownloadmanager-1.1.1-arm64-v8a-debug.apk` from the
 [latest release](https://github.com/idontknowanythingelseforsure-bit/SH-Download-Manager/releases/latest)
 and open it on the device (allow "install unknown apps" for your file manager
 or browser). Because CI signs debug builds with a fresh key, uninstall an older
@@ -225,7 +227,7 @@ Every push to `master` also builds a debug APK in GitHub Actions:
 
 1. Open the **Actions** tab → **Build APK** → latest run.
 2. Download the `SH-Download-Manager-apk` artifact.
-3. Unzip it and install `shdownloadmanager-1.1.0-arm64-v8a-debug.apk`.
+3. Unzip it and install `shdownloadmanager-1.1.1-arm64-v8a-debug.apk`.
 
 Share a link from Chrome or any other browser to **SH Download Manager** and
 the Add sheet opens with the URL filled in.

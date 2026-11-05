@@ -8,7 +8,7 @@ from pathlib import Path
 
 APP_NAME = "SH Download Manager"
 APP_ID = "SHDownloadManager"
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 CATEGORIES: dict[str, list[str]] = {
     "Compressed": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".zst", ".iso", ".cab"],

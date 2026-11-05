@@ -19,7 +19,7 @@ source.include_exts = py,png,jpg,jpeg,kv,atlas,txt,ico,json,md
 source.exclude_dirs = .git,bin,.buildozer,__pycache__,tests,.github,build,dist,docs,installer,browser_extension,tools
 source.exclude_patterns = *.exe,*.pyw,*.apk,*.zip,*.iss,*.ps1,*.log
 
-version = 1.1.0
+version = 1.1.1
 
 # ---------------------------------------------------------------------------
 # Python requirements

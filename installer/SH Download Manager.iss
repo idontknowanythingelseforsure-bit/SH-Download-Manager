@@ -9,8 +9,8 @@
 ; ---------------------------------------------------------------------------
 
 #define AppName        "SH Download Manager"
-#define AppVersion     "1.1.0"
-#define AppVersionNum  "1.1.0.0"
+#define AppVersion     "1.1.1"
+#define AppVersionNum  "1.1.1.0"
 #define AppPublisher   "SH Download Manager"
 #define AppExeName     "SH Download Manager.exe"
 #define AppUrl         "https://github.com/idontknowanythingelseforsure-bit/YT-Audio-Player"

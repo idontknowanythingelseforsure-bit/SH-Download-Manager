@@ -17,12 +17,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'SH Download Manager'),
             StringStruct('FileDescription', 'SH Download Manager'),
-            StringStruct('FileVersion', '1.1.0.0'),
+            StringStruct('FileVersion', '1.1.1.0'),
             StringStruct('InternalName', 'SHDownloadManager'),
             StringStruct('LegalCopyright', 'Copyright (C) 2026 SH Download Manager'),
             StringStruct('OriginalFilename', 'SH Download Manager.exe'),
             StringStruct('ProductName', 'SH Download Manager'),
-            StringStruct('ProductVersion', '1.1.0.0'),
+            StringStruct('ProductVersion', '1.1.1.0'),
             StringStruct('Comments', 'Original independent download manager')
           ]
         )
