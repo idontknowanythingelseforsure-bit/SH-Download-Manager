@@ -215,12 +215,17 @@ repository root is the Kivy entry point.
 
 ### Install the APK
 
-Every push to `master` builds a debug APK in GitHub Actions:
+Download `shdownloadmanager-1.1.0-arm64-v8a-debug.apk` from the
+[latest release](https://github.com/idontknowanythingelseforsure-bit/SH-Download-Manager/releases/latest)
+and open it on the device (allow "install unknown apps" for your file manager
+or browser). Because CI signs debug builds with a fresh key, uninstall an older
+copy first.
+
+Every push to `master` also builds a debug APK in GitHub Actions:
 
 1. Open the **Actions** tab → **Build APK** → latest run.
 2. Download the `SH-Download-Manager-apk` artifact.
-3. Unzip it and install `bin/shdm-1.1.0-arm64-v8a-debug.apk` on the device
-   (allow "install unknown apps" for your file manager or browser).
+3. Unzip it and install `shdownloadmanager-1.1.0-arm64-v8a-debug.apk`.
 
 Share a link from Chrome or any other browser to **SH Download Manager** and
 the Add sheet opens with the URL filled in.

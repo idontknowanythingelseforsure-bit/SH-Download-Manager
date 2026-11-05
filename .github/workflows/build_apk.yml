@@ -3,6 +3,10 @@ name: Build APK
 on:
   push:
     branches: [master]
+    # Documentation-only pushes do not need a new APK.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
   workflow_dispatch:
 
