@@ -10,6 +10,7 @@ has to be a child of ``<application>``, and p4a has no flag for providers:
 provider is injected here instead.
 """
 
+import glob
 import os
 
 FILE_PROVIDER = """
@@ -25,23 +26,32 @@ FILE_PROVIDER = """
 """
 
 
+def _manifest_candidates(toolchain):
+    """Manifest paths to try, most specific first."""
+    dist_dir = getattr(getattr(toolchain, "_dist", None), "dist_dir", None)
+    if dist_dir:
+        yield os.path.join(dist_dir, "src", "main", "AndroidManifest.xml")
+    # Fallback if p4a did not expose the dist object to the hook.
+    pattern = os.path.join(
+        ".buildozer", "android", "platform", "*", "dists", "*", "src", "main",
+        "AndroidManifest.xml",
+    )
+    for path in glob.glob(pattern):
+        yield path
+
+
 def after_apk_build(toolchain):
     """Add the FileProvider to the generated manifest."""
-    try:
-        dist_dir = toolchain._dist.dist_dir
-    except Exception:
-        return
+    for manifest in _manifest_candidates(toolchain):
+        if not os.path.exists(manifest):
+            continue
 
-    manifest = os.path.join(dist_dir, "src", "main", "AndroidManifest.xml")
-    if not os.path.exists(manifest):
-        return
+        with open(manifest, "r", encoding="utf-8") as handle:
+            text = handle.read()
 
-    with open(manifest, "r", encoding="utf-8") as handle:
-        text = handle.read()
+        if "androidx.core.content.FileProvider" in text:
+            continue
 
-    if "androidx.core.content.FileProvider" in text:
-        return
-
-    text = text.replace("</application>", FILE_PROVIDER + "    </application>")
-    with open(manifest, "w", encoding="utf-8") as handle:
-        handle.write(text)
+        text = text.replace("</application>", FILE_PROVIDER + "    </application>")
+        with open(manifest, "w", encoding="utf-8") as handle:
+            handle.write(text)
