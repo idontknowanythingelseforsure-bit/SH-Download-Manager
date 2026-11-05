@@ -260,7 +260,7 @@ src/shdm/mobile/device.py      Storage, permissions, share intent, open file
 src/shdm/mobile/theme.py       Dark palette and drawn widgets
 buildozer.spec                 python-for-android configuration
 android_intent_filters.xml     Share-sheet intent filter
-android_extra_application.xml  FileProvider for Open / Open Folder
+p4a_hooks.py                   Injects the FileProvider into the manifest
 android_res/xml/file_paths.xml FileProvider paths
 ```
 

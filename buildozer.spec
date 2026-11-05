@@ -45,9 +45,12 @@ android.permissions = INTERNET,ACCESS_NETWORK_STATE,WAKE_LOCK
 # Share a link from a browser straight into the app.
 android.manifest.intent_filters = android_intent_filters.xml
 # androidx FileProvider, used by "Open" / "Open Folder" in the completion card.
-android.extra_manifest_application_arguments = android_extra_application.xml
+# The <provider> element is injected by p4a_hooks.py: p4a's
+# --extra-manifest-application-arguments writes into the <application ...>
+# opening tag, which is not valid for a child element.
 android.gradle_dependencies = androidx.core:core:1.10.1
 android.add_resources = android_res
+p4a.hook = p4a_hooks.py
 
 android.api = 33
 android.minapi = 21

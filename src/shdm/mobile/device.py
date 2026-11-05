@@ -155,8 +155,9 @@ class WakeLock:
             from jnius import autoclass
 
             manager_cls = autoclass("android.os.PowerManager")
+            context_cls = autoclass("android.content.Context")
             ctx = activity()
-            manager = ctx.getSystemService(ctx.POWER_SERVICE)
+            manager = ctx.getSystemService(context_cls.POWER_SERVICE)
             self._lock = manager.newWakeLock(
                 manager_cls.PARTIAL_WAKE_LOCK, PACKAGE + ":downloads"
             )

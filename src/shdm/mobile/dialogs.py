@@ -70,6 +70,9 @@ class BaseDialog(ModalView):
         )
         self.width = min(dp(width), Window.width - dp(12))
         self.height = min(dp(height), Window.height - dp(20))
+        self._base_size = (dp(width), dp(height))
+        Window.bind(size=self._clamp)
+        self.bind(on_dismiss=lambda *_: Window.unbind(size=self._clamp))
         self.panel = Card(
             orientation="vertical", padding=dp(16), spacing=dp(10), radius=14
         )
@@ -85,6 +88,11 @@ class BaseDialog(ModalView):
             close.bind(on_release=lambda *_: self.dismiss())
             header.add_widget(close)
             self.panel.add_widget(header)
+
+    def _clamp(self, *_args):
+        base_w, base_h = self._base_size
+        self.width = min(base_w, Window.width - dp(12))
+        self.height = min(base_h, Window.height - dp(20))
 
     def body(self) -> BoxLayout:
         """A scrollable body; callers add widgets to the returned layout."""
