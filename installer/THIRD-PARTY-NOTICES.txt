@@ -1,0 +1,56 @@
+SH Download Manager - third-party notices
+==========================================
+
+SH Download Manager itself is an original application. It is assembled from
+open-source components, listed below. Each component keeps its own license.
+
+FFmpeg (ffmpeg\ffmpeg.exe)
+--------------------------
+Copyright (c) 2000-2022 the FFmpeg developers.
+Licensed under the GNU General Public License, version 3 (GPLv3).
+This build is the "essentials" static Windows build by Gyan Doshi:
+    https://www.gyan.dev/ffmpeg/builds/
+    ffmpeg version 5.1.2-essentials_build-www.gyan.dev
+    configuration: --enable-gpl --enable-version3 --enable-static
+                   --enable-libmp3lame --enable-libx264 --enable-libx265
+                   (and other libraries, see "ffmpeg -version")
+
+FFmpeg is used as a separate command-line program to convert downloaded
+audio to MP3. The full license text is installed next to the program as
+ffmpeg\LICENSE.txt. FFmpeg source code is available from
+https://ffmpeg.org/download.html and the exact build's build script is at
+https://github.com/GyanD/codexffmpeg. A copy of the source used for this
+binary can be obtained from the address above; if that is not practical,
+contact the distributor of this package for a copy on physical media.
+
+Python 3.12 runtime
+-------------------
+Copyright (c) Python Software Foundation. Licensed under the PSF License
+Agreement. https://docs.python.org/3/license.html
+
+PyInstaller bootloader
+----------------------
+Copyright (c) 2010-2026 PyInstaller Development Team. GPLv2-or-later with a
+special exception that allows packaging proprietary applications.
+https://pyinstaller.org
+
+yt-dlp
+------
+Copyright (c) yt-dlp contributors. Licensed under the Unlicense (public
+domain). https://github.com/yt-dlp/yt-dlp
+
+Pillow
+------
+Copyright (c) 2010-2026 Jeffrey A. Clark and contributors.
+Licensed under the HPND license. https://python-pillow.org
+
+requests / urllib3 / certifi / charset-normalizer / idna
+---------------------------------------------------------
+Licensed under the Apache License 2.0 (requests, urllib3) and the MIT
+license (certifi, charset-normalizer, idna).
+https://requests.readthedocs.io
+
+Inno Setup (installer only, not installed)
+------------------------------------------
+Copyright (c) 1997-2026 Jordan Russell and Martijn Laan.
+Licensed under a custom license. https://jrsoftware.org/isinfo.php

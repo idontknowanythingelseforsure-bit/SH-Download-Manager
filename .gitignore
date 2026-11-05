@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Build artifacts
+*.exe
+*.apk
+*.zip
+*.log
+*.tmp
+
+# PyInstaller
+*.spec.bak
+
+# Buildozer
+.buildozer/
+bin/
+out/
+
+# Inno Setup
+*.iss.bak
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local state (never commit)
+downloads.json
+settings.json
+*.shdm-part
+
+# Test captures
+docs/*.png
+!docs/screenshot.png
+!docs/completion.png
+!docs/android-*.png

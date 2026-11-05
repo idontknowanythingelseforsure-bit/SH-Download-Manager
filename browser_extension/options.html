@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SH Download Manager options</title>
+  <style>
+    body { font: 14px/1.5 "Segoe UI", Arial, sans-serif; margin: 28px; color: #0f172a; background: #f6f8fc; }
+    main { max-width: 520px; margin: 0 auto; background: #fff; border: 1px solid #d8e0ea; border-radius: 10px; padding: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p { color: #64748b; margin: 0 0 18px; }
+    label { display: block; font-weight: 600; margin: 14px 0 6px; }
+    input { width: 140px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+    button { margin-top: 16px; padding: 9px 16px; border: 0; border-radius: 6px; background: #0b63ce; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #eef2f7; color: #0f172a; margin-left: 8px; }
+    #status { margin-top: 14px; color: #64748b; }
+    .good { color: #12805c !important; }
+    .bad { color: #b42318 !important; }
+    code { background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>SH Download Manager</h1>
+  <p>Connect this browser extension to the desktop app running on this PC.</p>
+
+  <label for="port">Local API port</label>
+  <input id="port" type="number" min="1024" max="65535" step="1">
+  <p style="margin-top:6px">The default is <code>53991</code>. It must match Settings → Integration in the app.</p>
+
+  <button id="save">Save</button>
+  <button id="test" class="secondary">Test connection</button>
+  <div id="status"></div>
+</main>
+<script src="options.js"></script>
+</body>
+</html>
